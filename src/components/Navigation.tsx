@@ -12,8 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 
 interface NavigationProps {
-  activeTab: "dashboard" | "products" | "preferences" | "content" | "admin" | "settings";
-  onTabChange: (tab: "dashboard" | "products" | "preferences" | "content" | "admin" | "settings") => void;
+  activeTab: "dashboard" | "products" | "preferences" | "content";
+  onTabChange: (tab: "dashboard" | "products" | "preferences" | "content") => void;
   onLogout?: () => void;
 }
 
@@ -44,7 +44,6 @@ export default function Navigation({ activeTab, onTabChange, onLogout }: Navigat
       icon: DocumentTextIcon,
       description: "Organize categories and content structure",
     },
-  
   ];
 
   return (
@@ -71,7 +70,7 @@ export default function Navigation({ activeTab, onTabChange, onLogout }: Navigat
             return (
               <button
                 key={tab.id}
-                onClick={() => onTabChange(tab.id as "dashboard" | "products" | "preferences" | "content" | "admin" | "settings")}
+                onClick={() => onTabChange(tab.id as "dashboard" | "products" | "preferences" | "content")}
                 className={cn(
                   "flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                   activeTab === tab.id

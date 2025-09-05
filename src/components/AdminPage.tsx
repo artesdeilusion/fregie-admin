@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, DocumentTextIcon, CogIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, CheckCircleIcon, XCircleIcon, DocumentTextIcon } from "@heroicons/react/24/outline"; // CogIcon removed - unused
 
 interface ImportResult {
   success: boolean;

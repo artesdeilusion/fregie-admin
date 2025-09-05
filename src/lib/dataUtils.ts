@@ -196,11 +196,11 @@ export const getAvailableCategories = () => {
  * Sanitizes product data to ensure it's compatible with Firestore
  * Flattens nested arrays and converts complex structures to simple strings
  */
-export const sanitizeProductData = (product: any): any => {
-  const sanitized: any = {};
+export const sanitizeProductData = (product: Record<string, unknown>): Record<string, unknown> => {
+  const sanitized: Record<string, unknown> = {};
   
   // Helper function to flatten nested arrays and convert to string
-  const flattenArray = (value: any): string[] => {
+  const flattenArray = (value: unknown): string[] => {
     if (!value) return [];
     
     if (Array.isArray(value)) {
@@ -227,7 +227,7 @@ export const sanitizeProductData = (product: any): any => {
   };
   
   // Helper function to ensure string values
-  const ensureString = (value: any): string => {
+  const ensureString = (value: unknown): string => {
     if (value === null || value === undefined) return '';
     if (typeof value === 'string') return value;
     if (Array.isArray(value)) {

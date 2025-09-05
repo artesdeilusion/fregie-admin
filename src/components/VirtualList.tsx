@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useRef, useMemo } from "react"; // useEffect removed - unused
 
 interface VirtualListProps<T> {
   items: T[];

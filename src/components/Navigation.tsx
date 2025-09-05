@@ -44,18 +44,7 @@ export default function Navigation({ activeTab, onTabChange, onLogout }: Navigat
       icon: DocumentTextIcon,
       description: "Organize categories and content structure",
     },
-    {
-      id: "admin",
-      name: "Bulk Operations",
-      icon: UserIcon,
-      description: "Import, export, and batch operations",
-    },
-    {
-      id: "settings",
-      name: "Settings",
-      icon: Cog6ToothIcon,
-      description: "System configuration and preferences",
-    },
+  
   ];
 
   return (

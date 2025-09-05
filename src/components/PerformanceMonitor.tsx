@@ -27,9 +27,11 @@ export default function PerformanceMonitor() {
     // Measure memory usage (if available)
     const measureMemory = () => {
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
-        const memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
-        setMetrics(prev => ({ ...prev, memoryUsage }));
+        const memory = (performance as { memory?: { usedJSHeapSize: number } }).memory;
+        if (memory) {
+          const memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
+          setMetrics(prev => ({ ...prev, memoryUsage }));
+        }
       }
     };
 

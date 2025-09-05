@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import Navigation from "@/components/Navigation";
-import { LazyProductsPage, LazyPreferencesPage, LazyAdminPage } from "@/components/LazyComponent";
+import { LazyPreferencesPage, LazyAdminPage } from "@/components/LazyComponent";
+import ImprovedProductsPage from "@/components/ImprovedProductsPage";
 import DashboardPage from "@/components/DashboardPage";
 import ContentManagementPage from "@/components/ContentManagementPage";
 import SettingsPage from "@/components/SettingsPage";
@@ -14,7 +15,7 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "preferences" | "content" | "admin" | "settings">("dashboard");
-  const { user, userRole, loading, logout, isAdmin } = useAuth();
+  const { user, loading, logout, isAdmin } = useAuth(); // userRole removed - unused
 
   const handleLogout = async () => {
     try {
@@ -47,16 +48,15 @@ export default function Home() {
         {activeTab === "dashboard" ? (
           <DashboardPage />
         ) : activeTab === "products" ? (
-          <LazyProductsPage />
+          <ImprovedProductsPage />
         ) : activeTab === "preferences" ? (
           <LazyPreferencesPage />
         ) : activeTab === "content" ? (
           <ContentManagementPage />
-        ) : activeTab === "admin" ? (
+        )  : (
           <LazyAdminPage />
-        ) : (
-          <SettingsPage />
-        )}
+        )  
+       }
       </main>
       <PerformanceMonitor />
     </div>

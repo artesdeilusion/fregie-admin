@@ -135,7 +135,7 @@ export default function LazyProductsPage() {
     return <ErrorMessage message={error} onRetry={refetch} />;
   }
 
-  const renderProductCard = (product: Product, index: number) => (
+  const renderProductCard = (product: Product) => (
     <div key={product.id} className="mb-6">
       <ProductCard
         product={product}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Product, FormProduct } from "@/types";
-import { XMarkIcon, PlusIcon, ArrowUpTrayIcon, FolderIcon } from "@heroicons/react/24/outline";
+import { useState } from "react";
+import { FormProduct } from "@/types";
+import { XMarkIcon, PlusIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline"; // FolderIcon removed - unused
 import { cn } from "@/lib/utils";
 import { bulkUploadProducts } from "@/lib/dataUtils";
 
@@ -36,7 +36,7 @@ export default function ProductUploadForm({ onSubmit, onCancel }: ProductUploadF
   const [newIngredient, setNewIngredient] = useState("");
   const [newAllergen, setNewAllergen] = useState("");
   const [jsonFile, setJsonFile] = useState<File | null>(null);
-  const [jsonData, setJsonData] = useState<any>(null);
+  const [jsonData, setJsonData] = useState<Record<string, unknown> | null>(null);
   const [uploadMode, setUploadMode] = useState<"single" | "bulk">("single");
 
   // Define the category structure based on your public/data folder
@@ -132,7 +132,7 @@ export default function ProductUploadForm({ onSubmit, onCancel }: ProductUploadF
         try {
           const data = JSON.parse(event.target?.result as string);
           setJsonData(data);
-        } catch (error) {
+        } catch {
           alert("Invalid JSON file");
           setJsonFile(null);
         }

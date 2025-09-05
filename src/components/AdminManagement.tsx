@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserRole, updateUserRole, setUserRole } from '@/lib/authUtils';
+import { getUserRole, updateUserRole } from '@/lib/authUtils'; // setUserRole removed - unused
 import { 
   UserIcon, 
   ShieldCheckIcon, 
@@ -250,7 +250,7 @@ export default function AdminManagement() {
               <ol className="list-decimal list-inside mt-2 space-y-1">
                 <li>Create the user account through Firebase Authentication</li>
                 <li>Use the Firebase Console or Admin SDK to set their role</li>
-                <li>Or use the provided script: <code className="bg-blue-100 px-1 rounded">node scripts/create-admin.js email@example.com "Name"</code></li>
+                <li>Or use the provided script: <code className="bg-blue-100 px-1 rounded">node scripts/create-admin.js email@example.com &quot;Name&quot;</code></li>
               </ol>
             </div>
           </div>

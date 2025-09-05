@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Preference, FormPreference } from "@/types";
 import { XMarkIcon, PlusIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline";
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils"; // Unused import
 
 interface PreferenceFormProps {
   preference?: Preference;
@@ -21,7 +21,7 @@ export default function PreferenceForm({ preference, onSubmit, onCancel }: Prefe
 
   const [newIngredient, setNewIngredient] = useState("");
   const [jsonFile, setJsonFile] = useState<File | null>(null);
-  const [jsonData, setJsonData] = useState<any>(null);
+  const [jsonData, setJsonData] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (preference) {
@@ -65,7 +65,7 @@ export default function PreferenceForm({ preference, onSubmit, onCancel }: Prefe
         try {
           const data = JSON.parse(event.target?.result as string);
           setJsonData(data);
-        } catch (error) {
+        } catch {
           alert("Invalid JSON file");
           setJsonFile(null);
         }
@@ -167,7 +167,7 @@ export default function PreferenceForm({ preference, onSubmit, onCancel }: Prefe
               {jsonData && (
                 <div className="bg-white p-3 rounded border">
                   <p className="text-sm text-gray-600 mb-2">
-                    <strong>JSON Preview:</strong> {Object.keys(jsonData)[0]} ({jsonData[Object.keys(jsonData)[0]]?.length || 0} ingredients)
+                    <strong>JSON Preview:</strong> {Object.keys(jsonData)[0]} ({Array.isArray(jsonData[Object.keys(jsonData)[0]]) ? (jsonData[Object.keys(jsonData)[0]] as unknown[]).length : 0} ingredients)
                   </p>
                   <button
                     type="button"

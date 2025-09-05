@@ -57,8 +57,8 @@ export default function AuthErrorDisplay({ error, onDismiss }: AuthErrorDisplayP
                 <p className="font-medium">To enable email/password authentication:</p>
                 <ol className="list-decimal list-inside mt-1 space-y-1">
                   <li>Go to Firebase Console → Authentication</li>
-                  <li>Click on "Sign-in method" tab</li>
-                  <li>Enable "Email/Password" provider</li>
+                  <li>Click on &quot;Sign-in method&quot; tab</li>
+                  <li>Enable &quot;Email/Password&quot; provider</li>
                   <li>Save the changes</li>
                 </ol>
               </div>

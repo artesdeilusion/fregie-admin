@@ -4,8 +4,6 @@ import { Product, Preference, FormProduct, FormPreference } from "@/types";
 import {
   getProductsPaginated,
   getPreferencesPaginated,
-  // getProductsCount, // Unused import
-  // getPreferencesCount, // Unused import
   addProduct,
   updateProduct,
   deleteProduct,
@@ -33,8 +31,8 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
-// Hook for paginated products with search and filtering
-export function useLazyProducts() {
+// Enhanced pagination hook for products
+export function useProductPagination() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -43,20 +41,23 @@ export function useLazyProducts() {
   const [total, setTotal] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   
   const pageSize = 20;
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const debouncedFilterBrand = useDebounce(filterBrand, 300);
   const isInitialLoad = useRef(true);
+  const searchResetRef = useRef(false);
 
-  const fetchProducts = useCallback(async (reset = false) => {
+  const fetchProducts = useCallback(async (page: number = 1, reset = false) => {
     try {
-      if (reset) {
+      if (reset || page === 1) {
         setLoading(true);
         setProducts([]);
         setLastDoc(null);
         setHasMore(true);
+        setCurrentPage(1);
       } else {
         setLoadingMore(true);
       }
@@ -65,24 +66,26 @@ export function useLazyProducts() {
       
       const options: PaginationOptions = {
         pageSize,
-        lastDoc: reset ? undefined : lastDoc || undefined,
+        lastDoc: reset || page === 1 ? undefined : lastDoc || undefined,
         searchTerm: debouncedSearchTerm || undefined,
         filterBrand: debouncedFilterBrand || undefined,
       };
       
       const result: PaginatedResult<Product> = await getProductsPaginated(options);
       
-      if (reset) {
+      if (reset || page === 1) {
         setProducts(result.data);
         setTotal(result.total || 0);
+        setCurrentPage(1);
       } else {
         setProducts(prev => [...prev, ...result.data]);
+        setCurrentPage(page);
       }
       
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
     } catch (err) {
-      console.error('useLazyProducts: Error fetching products:', err);
+      console.error('useProductPagination: Error fetching products:', err);
       setError(err instanceof Error ? err.message : "Failed to fetch products");
     } finally {
       setLoading(false);
@@ -92,38 +95,48 @@ export function useLazyProducts() {
 
   const loadMore = useCallback(() => {
     if (!loadingMore && hasMore) {
-      fetchProducts(false);
+      fetchProducts(currentPage + 1, false);
     }
-  }, [fetchProducts, loadingMore, hasMore]);
+  }, [fetchProducts, loadingMore, hasMore, currentPage]);
+
+  const goToPage = useCallback((page: number) => {
+    if (page >= 1 && page !== currentPage) {
+      fetchProducts(page, true);
+    }
+  }, [fetchProducts, currentPage]);
 
   const search = useCallback((term: string) => {
     setSearchTerm(term);
+    searchResetRef.current = true;
   }, []);
 
   const filterByBrand = useCallback((brand: string) => {
     setFilterBrand(brand);
+    searchResetRef.current = true;
   }, []);
 
   const reset = useCallback(() => {
     setSearchTerm("");
     setFilterBrand("");
+    setCurrentPage(1);
     setLastDoc(null);
     setHasMore(true);
-    fetchProducts(true);
+    fetchProducts(1, true);
   }, [fetchProducts]);
 
   // Initial load
   useEffect(() => {
     if (isInitialLoad.current) {
-      fetchProducts(true);
+      fetchProducts(1, true);
       isInitialLoad.current = false;
     }
   }, [fetchProducts]);
 
-  // Reset when search or filter changes
+  // Reset when search or filter changes (but only if it's not the initial load)
   useEffect(() => {
-    if (!isInitialLoad.current) {
-      fetchProducts(true);
+    if (!isInitialLoad.current && searchResetRef.current) {
+      fetchProducts(1, true);
+      searchResetRef.current = false;
     }
   }, [debouncedSearchTerm, debouncedFilterBrand, fetchProducts]);
 
@@ -165,6 +178,11 @@ export function useLazyProducts() {
     }
   }, []);
 
+  // Calculate pagination info
+  const totalPages = Math.ceil(total / pageSize);
+  const startIndex = (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, total);
+
   return {
     products,
     loading,
@@ -172,21 +190,26 @@ export function useLazyProducts() {
     error,
     hasMore,
     total,
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
     searchTerm,
     filterBrand,
     search,
     filterByBrand,
     loadMore,
+    goToPage,
     reset,
     addProduct: addNewProduct,
     updateProduct: updateExistingProduct,
     deleteProduct: removeProduct,
-    refetch: () => fetchProducts(true),
+    refetch: () => fetchProducts(1, true),
   };
 }
 
-// Hook for paginated preferences with search and filtering
-export function useLazyPreferences() {
+// Enhanced pagination hook for preferences
+export function usePreferencePagination() {
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -195,20 +218,23 @@ export function useLazyPreferences() {
   const [total, setTotal] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   
   const pageSize = 20;
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const debouncedFilterType = useDebounce(filterType, 300);
   const isInitialLoad = useRef(true);
+  const searchResetRef = useRef(false);
 
-  const fetchPreferences = useCallback(async (reset = false) => {
+  const fetchPreferences = useCallback(async (page: number = 1, reset = false) => {
     try {
-      if (reset) {
+      if (reset || page === 1) {
         setLoading(true);
         setPreferences([]);
         setLastDoc(null);
         setHasMore(true);
+        setCurrentPage(1);
       } else {
         setLoadingMore(true);
       }
@@ -217,24 +243,26 @@ export function useLazyPreferences() {
       
       const options: PaginationOptions = {
         pageSize,
-        lastDoc: reset ? undefined : lastDoc || undefined,
+        lastDoc: reset || page === 1 ? undefined : lastDoc || undefined,
         searchTerm: debouncedSearchTerm || undefined,
         filterType: debouncedFilterType || undefined,
       };
       
       const result: PaginatedResult<Preference> = await getPreferencesPaginated(options);
       
-      if (reset) {
+      if (reset || page === 1) {
         setPreferences(result.data);
         setTotal(result.total || 0);
+        setCurrentPage(1);
       } else {
         setPreferences(prev => [...prev, ...result.data]);
+        setCurrentPage(page);
       }
       
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
     } catch (err) {
-      console.error('useLazyPreferences: Error fetching preferences:', err);
+      console.error('usePreferencePagination: Error fetching preferences:', err);
       setError(err instanceof Error ? err.message : "Failed to fetch preferences");
     } finally {
       setLoading(false);
@@ -244,38 +272,48 @@ export function useLazyPreferences() {
 
   const loadMore = useCallback(() => {
     if (!loadingMore && hasMore) {
-      fetchPreferences(false);
+      fetchPreferences(currentPage + 1, false);
     }
-  }, [fetchPreferences, loadingMore, hasMore]);
+  }, [fetchPreferences, loadingMore, hasMore, currentPage]);
+
+  const goToPage = useCallback((page: number) => {
+    if (page >= 1 && page !== currentPage) {
+      fetchPreferences(page, true);
+    }
+  }, [fetchPreferences, currentPage]);
 
   const search = useCallback((term: string) => {
     setSearchTerm(term);
+    searchResetRef.current = true;
   }, []);
 
   const filterByType = useCallback((type: string) => {
     setFilterType(type);
+    searchResetRef.current = true;
   }, []);
 
   const reset = useCallback(() => {
     setSearchTerm("");
     setFilterType("");
+    setCurrentPage(1);
     setLastDoc(null);
     setHasMore(true);
-    fetchPreferences(true);
+    fetchPreferences(1, true);
   }, [fetchPreferences]);
 
   // Initial load
   useEffect(() => {
     if (isInitialLoad.current) {
-      fetchPreferences(true);
+      fetchPreferences(1, true);
       isInitialLoad.current = false;
     }
   }, [fetchPreferences]);
 
-  // Reset when search or filter changes
+  // Reset when search or filter changes (but only if it's not the initial load)
   useEffect(() => {
-    if (!isInitialLoad.current) {
-      fetchPreferences(true);
+    if (!isInitialLoad.current && searchResetRef.current) {
+      fetchPreferences(1, true);
+      searchResetRef.current = false;
     }
   }, [debouncedSearchTerm, debouncedFilterType, fetchPreferences]);
 
@@ -317,6 +355,11 @@ export function useLazyPreferences() {
     }
   }, []);
 
+  // Calculate pagination info
+  const totalPages = Math.ceil(total / pageSize);
+  const startIndex = (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, total);
+
   return {
     preferences,
     loading,
@@ -324,15 +367,20 @@ export function useLazyPreferences() {
     error,
     hasMore,
     total,
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
     searchTerm,
     filterType,
     search,
     filterByType,
     loadMore,
+    goToPage,
     reset,
     addPreference: addNewPreference,
     updatePreference: updateExistingPreference,
     deletePreference: removePreference,
-    refetch: () => fetchPreferences(true),
+    refetch: () => fetchPreferences(1, true),
   };
 }

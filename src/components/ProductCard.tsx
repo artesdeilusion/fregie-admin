@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Product } from "@/types";
 import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils"; // Unused import
 
 interface ProductCardProps {
   product: Product;

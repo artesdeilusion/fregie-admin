@@ -6,9 +6,9 @@ import {
   ShieldCheckIcon,
   CircleStackIcon,
   BellIcon,
-  UserIcon,
-  GlobeAltIcon,
-  DocumentTextIcon,
+  // UserIcon, // Unused import
+  // GlobeAltIcon, // Unused import
+  // DocumentTextIcon, // Unused import
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
   UsersIcon
@@ -19,7 +19,7 @@ interface SettingSection {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 export default function SettingsPage() {
@@ -84,7 +84,7 @@ export default function SettingsPage() {
     }
   ];
 
-  const handleSettingChange = (section: string, key: string, value: any) => {
+  const handleSettingChange = (section: string, key: string, value: unknown) => {
     setSettings(prev => ({
       ...prev,
       [section]: {

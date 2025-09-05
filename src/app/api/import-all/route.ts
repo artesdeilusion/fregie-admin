@@ -84,18 +84,18 @@ export async function POST(request: NextRequest) {
                 
                 // Normalize product data
                 const normalizedProduct: ImportedProduct = {
-                  name: sanitizedProduct.name,
-                  brand: sanitizedProduct.brand,
-                  barcode: sanitizedProduct.barcode,
-                  image_url: sanitizedProduct.image_url,
-                  ingredients: sanitizedProduct.ingredients,
-                  alergen_warning: sanitizedProduct.alergen_warning,
-                  net_weight: sanitizedProduct.net_weight,
-                  nutritional_info: sanitizedProduct.nutritional_info,
-                  manufacturer: sanitizedProduct.manufacturer,
-                  origin: sanitizedProduct.origin,
-                  storage_conditions: sanitizedProduct.storage_conditions,
-                  local_image_path: sanitizedProduct.local_image_path,
+                  name: String(sanitizedProduct.name),
+                  brand: String(sanitizedProduct.brand),
+                  barcode: String(sanitizedProduct.barcode),
+                  image_url: String(sanitizedProduct.image_url),
+                  ingredients: Array.isArray(sanitizedProduct.ingredients) ? sanitizedProduct.ingredients : [],
+                  alergen_warning: Array.isArray(sanitizedProduct.alergen_warning) ? sanitizedProduct.alergen_warning : [],
+                  net_weight: String(sanitizedProduct.net_weight),
+                  nutritional_info: String(sanitizedProduct.nutritional_info),
+                  manufacturer: String(sanitizedProduct.manufacturer),
+                  origin: String(sanitizedProduct.origin),
+                  storage_conditions: String(sanitizedProduct.storage_conditions),
+                  local_image_path: String(sanitizedProduct.local_image_path),
                   category,
                   subcategory
                 };

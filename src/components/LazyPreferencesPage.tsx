@@ -105,7 +105,7 @@ export default function LazyPreferencesPage() {
     return <ErrorMessage message={error} onRetry={refetch} />;
   }
 
-  const renderPreferenceCard = (preference: Preference, index: number) => (
+  const renderPreferenceCard = (preference: Preference) => (
     <div key={preference.id} className="mb-6">
       <PreferenceCard
         preference={preference}

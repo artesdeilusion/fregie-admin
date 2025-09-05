@@ -10,6 +10,8 @@ export interface Product {
   net_weight?: string; // Example: "120" (optional)
   nutritional_info: string; // Example: "Enerji (kcal): 480..."
   origin?: string; // Example: "TÜRKİYE" (optional)
+  category?: string; // Product category
+  subcategory?: string; // Product subcategory
 }
 
 export interface Preference {
@@ -31,6 +33,8 @@ export interface FormProduct {
   net_weight?: string;
   nutritional_info: string;
   origin?: string;
+  category?: string;
+  subcategory?: string;
 }
 
 export interface FormPreference {

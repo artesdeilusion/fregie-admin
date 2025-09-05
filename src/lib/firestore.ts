@@ -13,7 +13,7 @@ import {
   orderBy,
   limit,
   startAfter,
-  where,
+  // where, // Unused import
   getCountFromServer,
 } from "firebase/firestore";
 import { getFirebaseDB } from "./firebase";
@@ -118,25 +118,25 @@ const getPreferencesCollection = () => {
 };
 
 // Helper function to migrate existing product data
-export const migrateProductData = (data: any): Product => {
+export const migrateProductData = (data: Record<string, unknown>): Product => {
   // Always return a valid product, even with missing fields
       return {
-      id: data.id || "",
+      id: String(data.id || ""),
       alergen_warning: Array.isArray(data.alergen_warning) ? data.alergen_warning : [],
-      barcode: data.barcode || "",
-      brand: data.brand || "",
-      image_url: data.image_url || "",
+      barcode: String(data.barcode || ""),
+      brand: String(data.brand || ""),
+      image_url: String(data.image_url || ""),
       ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
-      manufacturer: data.manufacturer || "",
-      name: data.name || data.meta?.name || "",
-      net_weight: data.net_weight || "",
-      nutritional_info: data.nutritional_info || "",
-      origin: data.origin || "",
+      manufacturer: String(data.manufacturer || ""),
+      name: String(data.name || ""),
+      net_weight: String(data.net_weight || ""),
+      nutritional_info: String(data.nutritional_info || ""),
+      origin: String(data.origin || ""),
     };
 };
 
 // Helper function to migrate existing preference data
-export const migratePreferenceData = (data: any): Preference => {
+export const migratePreferenceData = (data: Record<string, unknown>): Preference => {
   try {
     // Validate required fields
     if (!data.id) {
@@ -144,11 +144,11 @@ export const migratePreferenceData = (data: any): Preference => {
     }
     
     const migrated = {
-      id: data.id || "",
+      id: String(data.id || ""),
       ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
-      name: data.name || "",
-      type: data.type || "",
-      typeId: data.typeId || "",
+      name: String(data.name || ""),
+      type: String(data.type || ""),
+      typeId: String(data.typeId || ""),
     };
     
     return migrated;

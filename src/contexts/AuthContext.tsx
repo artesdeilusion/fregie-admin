@@ -8,13 +8,14 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // setDoc removed - unused
 import { getFirebaseAuth, getFirebaseDB } from '@/lib/firebase';
-import { setUserRole } from '@/lib/authUtils';
+import { setUserRole as setUserRoleInFirestore } from '@/lib/authUtils';
 
 // Helper function to get user-friendly Firebase error messages
-const getFirebaseErrorMessage = (error: any): string => {
-  switch (error.code) {
+const getFirebaseErrorMessage = (error: unknown): string => {
+  const firebaseError = error as { code?: string; message?: string };
+  switch (firebaseError.code) {
     case 'auth/user-not-found':
       return 'No user found with this email address.';
     case 'auth/wrong-password':
@@ -38,7 +39,7 @@ const getFirebaseErrorMessage = (error: any): string => {
     case 'auth/requires-recent-login':
       return 'This operation requires recent authentication. Please log in again.';
     default:
-      return error.message || 'An error occurred during authentication.';
+      return firebaseError.message || 'An error occurred during authentication.';
   }
 };
 
@@ -120,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sign in error:', error);
       setError(getFirebaseErrorMessage(error));
       throw error;
@@ -136,8 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
       // Create user document in Firestore with default role
-      await setUserRole(userCredential.user.uid, 'user', email, name);
-    } catch (error: any) {
+      await setUserRoleInFirestore(userCredential.user.uid, 'user', email, name);
+    } catch (error: unknown) {
       console.error('Sign up error:', error);
       setError(getFirebaseErrorMessage(error));
       throw error;
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       await signOut(auth);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Logout error:', error);
       setError(getFirebaseErrorMessage(error));
       throw error;

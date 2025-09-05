@@ -9,20 +9,22 @@ import {
   CheckIcon,
   TrashIcon,
   PencilIcon,
-  // FunnelIcon, // Unused import
   ArrowsUpDownIcon,
-  // EllipsisHorizontalIcon // Unused import
 } from "@heroicons/react/24/outline";
 import ProductCard from "./ProductCard";
 import ProductForm from "./ProductForm";
 import ProductUploadForm from "./ProductUploadForm";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
-import { useLazyProducts } from "@/hooks/useLazyFirestore";
+import Pagination from "./Pagination";
+import InfiniteScroll from "./InfiniteScroll";
+import VirtualList from "./VirtualList";
+import { useProductPagination } from "@/hooks/usePagination";
 import { saveProductToDataFolder, validateProductData } from "@/lib/dataUtils";
 
 type SortOption = 'name' | 'brand' | 'category';
 type SortDirection = 'asc' | 'desc';
+type ViewMode = 'grid' | 'table' | 'infinite' | 'virtual';
 
 interface BulkAction {
   id: string;
@@ -32,7 +34,7 @@ interface BulkAction {
   destructive?: boolean;
 }
 
-export default function EnhancedProductsPage() {
+export default function ImprovedProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>();
@@ -41,7 +43,7 @@ export default function EnhancedProductsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const { 
     products, 
@@ -50,18 +52,23 @@ export default function EnhancedProductsPage() {
     error, 
     hasMore,
     total,
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
     searchTerm,
     filterBrand,
     search,
     filterByBrand,
     loadMore,
+    goToPage,
     addProduct, 
     updateProduct, 
     deleteProduct, 
     refetch 
-  } = useLazyProducts();
+  } = useProductPagination();
 
-  // Since we're using server-side filtering, we only need client-side category filtering and sorting
+  // Client-side filtering and sorting for categories and sorting
   const filteredAndSortedProducts = useMemo(() => {
     const filtered = products.filter((product) => {
       const matchesCategory = !filterCategory || product.category === filterCategory;
@@ -211,11 +218,29 @@ export default function EnhancedProductsPage() {
     }
   };
 
-  if (loading) {
+  const renderProductCard = (product: Product) => (
+    <div key={product.id} className="relative">
+      <div className="absolute top-2 left-2 z-10">
+        <input
+          type="checkbox"
+          checked={selectedProducts.has(product.id)}
+          onChange={(e) => handleSelectProduct(product.id, e.target.checked)}
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        />
+      </div>
+      <ProductCard
+        product={product}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+    </div>
+  );
+
+  if (loading && products.length === 0) {
     return <LoadingSpinner />;
   }
 
-  if (error) {
+  if (error && products.length === 0) {
     return <ErrorMessage message={error} onRetry={refetch} />;
   }
 
@@ -227,6 +252,11 @@ export default function EnhancedProductsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Products</h2>
           <p className="mt-1 text-sm text-gray-600">
             Manage food products, ingredients, and allergen information
+            {total > 0 && (
+              <span className="ml-2 text-blue-600">
+                ({products.length} of {total} loaded)
+              </span>
+            )}
           </p>
           {selectedProducts.size > 0 && (
             <p className="mt-1 text-sm text-blue-600">
@@ -381,6 +411,7 @@ export default function EnhancedProductsPage() {
             <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Grid View"
             >
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" clipRule="evenodd" />
@@ -389,9 +420,28 @@ export default function EnhancedProductsPage() {
             <button
               onClick={() => setViewMode('table')}
               className={`p-2 rounded-md ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Table View"
             >
               <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('infinite')}
+              className={`p-2 rounded-md ${viewMode === 'infinite' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Infinite Scroll"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('virtual')}
+              className={`p-2 rounded-md ${viewMode === 'virtual' ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Virtual Scrolling"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
             </button>
           </div>
@@ -415,111 +465,160 @@ export default function EnhancedProductsPage() {
             )}
           </div>
         </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedProducts.map((product) => (
-            <div key={product.id} className="relative">
-              <div className="absolute top-2 left-2 z-10">
-                <input
-                  type="checkbox"
-                  checked={selectedProducts.has(product.id)}
-                  onChange={(e) => handleSelectProduct(product.id, e.target.checked)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-              </div>
+      ) : viewMode === 'virtual' ? (
+        <VirtualList
+          items={filteredAndSortedProducts}
+          itemHeight={400}
+          containerHeight={600}
+          renderItem={renderProductCard}
+          className="border border-gray-200 rounded-lg"
+        />
+      ) : viewMode === 'infinite' ? (
+        <InfiniteScroll
+          hasMore={hasMore}
+          loading={loadingMore}
+          onLoadMore={loadMore}
+          className="space-y-6"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredAndSortedProducts.map((product) => (
               <ProductCard
+                key={product.id}
                 product={product}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
               />
-            </div>
-          ))}
-          
-          {/* Load More Button */}
-          {hasMore && (
-            <div className="col-span-full flex justify-center py-8">
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingMore ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading...
-                  </>
-                ) : (
-                  'Load More Products'
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barcode</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAndSortedProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+            ))}
+          </div>
+        </InfiniteScroll>
+      ) : viewMode === 'table' ? (
+        <>
+          <div className="bg-white shadow overflow-hidden sm:rounded-md">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={selectedProducts.has(product.id)}
-                      onChange={(e) => handleSelectProduct(product.id, e.target.checked)}
+                      checked={selectedProducts.size === filteredAndSortedProducts.length && filteredAndSortedProducts.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {product.image_url && (
-                        <img className="h-10 w-10 rounded-full mr-4" src={product.image_url} alt={product.name} />
-                      )}
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.brand}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.category || 'Uncategorized'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">{product.barcode}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-4"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </td>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barcode</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredAndSortedProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product.id)}
+                        onChange={(e) => handleSelectProduct(product.id, e.target.checked)}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        {product.image_url && (
+                          <img className="h-10 w-10 rounded-full mr-4" src={product.image_url} alt={product.name} />
+                        )}
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.brand}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.category || 'Uncategorized'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">{product.barcode}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(product.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            total={total}
+            loading={loading}
+          />
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredAndSortedProducts.map((product) => (
+              <div key={product.id} className="relative">
+                <div className="absolute top-2 left-2 z-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.has(product.id)}
+                    onChange={(e) => handleSelectProduct(product.id, e.target.checked)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                </div>
+                <ProductCard
+                  product={product}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ))}
+          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={goToPage}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            total={total}
+            loading={loading}
+          />
+        </>
+      )}
+
+      {/* Error display for partial loads */}
+      {error && products.length > 0 && (
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                Error loading more products
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={refetch}
+                  className="bg-red-100 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-200"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

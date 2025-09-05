@@ -17,7 +17,7 @@ export default function LoginForm() {
 
     try {
       await signIn(email, password);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Authentication error:', error);
       // Error is now handled in the AuthContext and displayed automatically
     }

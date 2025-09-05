@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { FormProduct } from '@/types';
+// import { FormProduct } from '@/types'; // Unused import
 
 // Helper function to get the correct file path
 function getFilePath(category: string, subcategory: string): string {
@@ -131,7 +131,7 @@ export async function PUT(request: NextRequest) {
     await fs.mkdir(dataDir, { recursive: true });
 
     // Process products to match your existing format
-    const processedProducts = products.map((product: any) => ({
+    const processedProducts = products.map((product: Record<string, unknown>) => ({
       name: product.name || product["﻿name"] || "",
       brand: product.brand || "",
       barcode: product.barcode || "",

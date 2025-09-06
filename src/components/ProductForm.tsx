@@ -22,6 +22,8 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
     net_weight: "",
     nutritional_info: "",
     origin: "",
+    category: "",
+    subcategory: "",
   });
 
   const [newIngredient, setNewIngredient] = useState("");
@@ -40,6 +42,8 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
         net_weight: product.net_weight || "",
         nutritional_info: product.nutritional_info,
         origin: product.origin || "",
+        category: product.category || "",
+        subcategory: product.subcategory || "",
       });
     }
   }, [product]);
@@ -174,6 +178,32 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
                 value={formData.manufacturer}
                 onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Category
+              </label>
+              <input
+                type="text"
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Food, Beverages, Snacks"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Subcategory
+              </label>
+              <input
+                type="text"
+                value={formData.subcategory}
+                onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., Dairy, Chips, Soft Drinks"
               />
             </div>
           

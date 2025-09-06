@@ -3,9 +3,7 @@
 import { 
   BeakerIcon, 
   CubeIcon, 
-  UserIcon, 
   ChartBarIcon,
-  Cog6ToothIcon,
   DocumentTextIcon,
   ArrowRightOnRectangleIcon
 } from "@heroicons/react/24/outline";

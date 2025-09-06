@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   FolderIcon,
   TagIcon,
@@ -11,6 +11,16 @@ import {
   ArrowsUpDownIcon
 } from "@heroicons/react/24/outline";
 import { useProducts } from "@/hooks/useFirestore";
+import { 
+  addCategory, 
+  updateCategory, 
+  deleteCategory, 
+  getCategories, 
+  getMainCategories,
+  getSubcategories,
+  getAllSubcategories,
+  CategoryData 
+} from "@/lib/firestore";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface Category {
@@ -21,18 +31,38 @@ interface Category {
 
 interface CategoryFormData {
   name: string;
-  description: string;
-  parent?: string;
+  level: 'category' | 'subcategory';
+  parentId?: string;
 }
 
 export default function ContentManagementPage() {
   const { products, loading } = useProducts();
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryFormData, setCategoryFormData] = useState<CategoryFormData>({
     name: '',
-    description: ''
+    level: 'category'
   });
+  const [savedCategories, setSavedCategories] = useState<CategoryData[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Load saved categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const categories = await getCategories();
+        setSavedCategories(categories);
+      } catch (error) {
+        console.error('Error loading categories:', error);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   // Analyze existing categories from products
   const categories = useMemo(() => {
@@ -61,19 +91,49 @@ export default function ContentManagementPage() {
     return Array.from(categoryMap.values()).sort((a, b) => b.productCount - a.productCount);
   }, [products]);
 
-  const handleCategorySubmit = (e: React.FormEvent) => {
+  const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Here you would typically save the category
-    console.log('Saving category:', categoryFormData);
-    setShowCategoryForm(false);
-    setCategoryFormData({ name: '', description: '' });
+    
+    try {
+      setLoadingCategories(true);
+      
+      if (editingCategoryId) {
+        // Update existing category
+        await updateCategory(editingCategoryId, {
+          name: categoryFormData.name,
+          level: categoryFormData.level,
+          parentId: categoryFormData.parentId
+        });
+      } else {
+        // Add new category
+        await addCategory({
+          name: categoryFormData.name,
+          level: categoryFormData.level,
+          parentId: categoryFormData.parentId
+        });
+      }
+      
+      // Refresh categories
+      const updatedCategories = await getCategories();
+      setSavedCategories(updatedCategories);
+      
+      setShowCategoryForm(false);
+      setEditingCategory(null);
+      setEditingCategoryId(null);
+      setCategoryFormData({ name: '', level: 'category' });
+    } catch (error) {
+      console.error('Error saving category:', error);
+      alert('Error saving category. Please try again.');
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
   const handleEditCategory = (categoryName: string) => {
     setEditingCategory(categoryName);
     setCategoryFormData({
       name: categoryName,
-      description: ''
+      level: 'category'
     });
     setShowCategoryForm(true);
   };
@@ -226,8 +286,52 @@ export default function ContentManagementPage() {
               
               <form onSubmit={handleCategorySubmit}>
                 <div className="mb-4">
+                  <label htmlFor="categoryLevel" className="block text-sm font-medium text-gray-700 mb-2">
+                    Category Level
+                  </label>
+                  <select
+                    id="categoryLevel"
+                    value={categoryFormData.level}
+                    onChange={(e) => setCategoryFormData({ 
+                      ...categoryFormData, 
+                      level: e.target.value as 'category' | 'subcategory',
+                      parentId: e.target.value === 'category' ? undefined : categoryFormData.parentId
+                    })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  >
+                    <option value="category">Main Category</option>
+                    <option value="subcategory">Subcategory</option>
+                  </select>
+                </div>
+
+                {categoryFormData.level === 'subcategory' && (
+                  <div className="mb-4">
+                    <label htmlFor="parentCategory" className="block text-sm font-medium text-gray-700 mb-2">
+                      Parent Category
+                    </label>
+                    <select
+                      id="parentCategory"
+                      value={categoryFormData.parentId || ''}
+                      onChange={(e) => setCategoryFormData({ ...categoryFormData, parentId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="">Select a parent category</option>
+                      {savedCategories
+                        .filter(cat => cat.level === 'category')
+                        .map(category => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                )}
+                
+                <div className="mb-4">
                   <label htmlFor="categoryName" className="block text-sm font-medium text-gray-700 mb-2">
-                    Category Name
+                    {categoryFormData.level === 'subcategory' ? 'Subcategory' : 'Category'} Name
                   </label>
                   <input
                     type="text"
@@ -239,18 +343,6 @@ export default function ContentManagementPage() {
                   />
                 </div>
                 
-                <div className="mb-6">
-                  <label htmlFor="categoryDescription" className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    id="categoryDescription"
-                    value={categoryFormData.description}
-                    onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
                 
                 <div className="flex justify-end space-x-3">
                   <button
@@ -258,7 +350,8 @@ export default function ContentManagementPage() {
                     onClick={() => {
                       setShowCategoryForm(false);
                       setEditingCategory(null);
-                      setCategoryFormData({ name: '', description: '' });
+                      setEditingCategoryId(null);
+                      setCategoryFormData({ name: '', level: 'category' });
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
                   >

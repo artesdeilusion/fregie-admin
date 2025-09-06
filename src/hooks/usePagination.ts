@@ -33,7 +33,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 // Enhanced pagination hook for products
 export function useProductPagination() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +54,9 @@ export function useProductPagination() {
     try {
       if (reset || page === 1) {
         setLoading(true);
-        setProducts([]);
+        setAllProducts([]);
         setLastDoc(null);
         setHasMore(true);
-        setCurrentPage(1);
       } else {
         setLoadingMore(true);
       }
@@ -74,14 +73,13 @@ export function useProductPagination() {
       const result: PaginatedResult<Product> = await getProductsPaginated(options);
       
       if (reset || page === 1) {
-        setProducts(result.data);
+        setAllProducts(result.data);
         setTotal(result.total || 0);
-        setCurrentPage(1);
       } else {
-        setProducts(prev => [...prev, ...result.data]);
-        setCurrentPage(page);
+        setAllProducts(prev => [...prev, ...result.data]);
       }
       
+      setCurrentPage(page);
       setLastDoc(result.lastDoc);
       setHasMore(result.hasMore);
     } catch (err) {
@@ -101,9 +99,34 @@ export function useProductPagination() {
 
   const goToPage = useCallback((page: number) => {
     if (page >= 1 && page !== currentPage) {
-      fetchProducts(page, true);
+      // Calculate how many products we need to load to reach this page
+      const productsNeeded = page * pageSize;
+      const productsLoaded = allProducts.length;
+      
+      if (productsNeeded <= productsLoaded) {
+        // We have enough products loaded, just change the page
+        setCurrentPage(page);
+      } else if (hasMore) {
+        // We need to load more products first
+        const pagesToLoad = Math.ceil((productsNeeded - productsLoaded) / pageSize);
+        let loadCount = 0;
+        
+        const loadNextPage = async () => {
+          if (loadCount < pagesToLoad && hasMore) {
+            loadCount++;
+            await fetchProducts(currentPage + loadCount, false);
+            if (loadCount < pagesToLoad) {
+              loadNextPage();
+            } else {
+              setCurrentPage(page);
+            }
+          }
+        };
+        
+        loadNextPage();
+      }
     }
-  }, [fetchProducts, currentPage]);
+  }, [fetchProducts, currentPage, allProducts.length, hasMore, pageSize]);
 
   const search = useCallback((term: string) => {
     setSearchTerm(term);
@@ -148,7 +171,7 @@ export function useProductPagination() {
         ...productData,
         id: newId,
       };
-      setProducts(prev => [newProduct, ...prev]);
+      setAllProducts(prev => [newProduct, ...prev]);
       return newId;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add product");
@@ -160,7 +183,7 @@ export function useProductPagination() {
     try {
       setError(null);
       await updateProduct(id, productData);
-      setProducts(prev => prev.map(p => p.id === id ? { ...productData, id } : p));
+      setAllProducts(prev => prev.map(p => p.id === id ? { ...productData, id } : p));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update product");
       throw err;
@@ -171,17 +194,20 @@ export function useProductPagination() {
     try {
       setError(null);
       await deleteProduct(id);
-      setProducts(prev => prev.filter(p => p.id !== id));
+      setAllProducts(prev => prev.filter(p => p.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete product");
       throw err;
     }
   }, []);
 
-  // Calculate pagination info
+  // Calculate pagination info and slice products for current page
   const totalPages = Math.ceil(total / pageSize);
-  const startIndex = (currentPage - 1) * pageSize + 1;
-  const endIndex = Math.min(currentPage * pageSize, total);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const products = allProducts.slice(startIndex, endIndex);
+  const displayStartIndex = startIndex + 1;
+  const displayEndIndex = Math.min(endIndex, total);
 
   return {
     products,
@@ -192,8 +218,8 @@ export function useProductPagination() {
     total,
     currentPage,
     totalPages,
-    startIndex,
-    endIndex,
+    startIndex: displayStartIndex,
+    endIndex: displayEndIndex,
     searchTerm,
     filterBrand,
     search,

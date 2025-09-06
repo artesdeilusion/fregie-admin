@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Product, FormProduct } from "@/types";
 import { 
   MagnifyingGlassIcon, 
@@ -21,6 +21,7 @@ import InfiniteScroll from "./InfiniteScroll";
 import VirtualList from "./VirtualList";
 import { useProductPagination } from "@/hooks/usePagination";
 import { saveProductToDataFolder, validateProductData } from "@/lib/dataUtils";
+import { getAllUniqueBrands, getAllUniqueCategories } from "@/lib/firestore";
 
 type SortOption = 'name' | 'brand' | 'category';
 type SortDirection = 'asc' | 'desc';
@@ -44,6 +45,9 @@ export default function ImprovedProductsPage() {
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [searchInput, setSearchInput] = useState("");
+  const [allBrands, setAllBrands] = useState<string[]>([]);
+  const [allCategories, setAllCategories] = useState<string[]>([]);
 
   const { 
     products, 
@@ -91,12 +95,12 @@ export default function ImprovedProductsPage() {
   }, [products, filterCategory, sortBy, sortDirection]);
 
   const uniqueBrands = useMemo(() => {
-    return Array.from(new Set(products.map(p => p.brand))).sort();
-  }, [products]);
+    return allBrands;
+  }, [allBrands]);
 
   const uniqueCategories = useMemo(() => {
-    return Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort();
-  }, [products]);
+    return allCategories;
+  }, [allCategories]);
 
   const bulkActions: BulkAction[] = [
     {
@@ -218,6 +222,38 @@ export default function ImprovedProductsPage() {
     }
   };
 
+  const handleSearch = () => {
+    search(searchInput);
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    search("");
+  };
+
+  // Sync search input with current search term
+  useEffect(() => {
+    setSearchInput(searchTerm);
+  }, [searchTerm]);
+
+  // Load all unique brands and categories on component mount
+  useEffect(() => {
+    const loadAllData = async () => {
+      try {
+        const [brands, categories] = await Promise.all([
+          getAllUniqueBrands(),
+          getAllUniqueCategories()
+        ]);
+        setAllBrands(brands);
+        setAllCategories(categories);
+      } catch (error) {
+        console.error("Failed to load all brands and categories:", error);
+      }
+    };
+    
+    loadAllData();
+  }, []);
+
   const renderProductCard = (product: Product) => (
     <div key={product.id} className="relative">
       <div className="absolute top-2 left-2 z-10">
@@ -328,17 +364,35 @@ export default function ImprovedProductsPage() {
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           {/* Search */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          <div className="relative flex">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search products..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => search(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <button
+              onClick={handleSearch}
+              className="ml-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <MagnifyingGlassIcon className="h-4 w-4 mr-2" />
+              Search
+            </button>
+            {searchTerm && (
+              <button
+                onClick={handleClearSearch}
+                className="ml-2 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Brand Filter */}

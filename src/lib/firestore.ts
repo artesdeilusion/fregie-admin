@@ -50,6 +50,8 @@ const productConverter = {
       net_weight: String(product.net_weight || ""),
       nutritional_info: String(product.nutritional_info || ""),
       origin: String(product.origin || ""),
+      category: String(product.category || ""),
+      subcategory: String(product.subcategory || ""),
     };
     
     // Validate that no nested arrays exist
@@ -81,6 +83,8 @@ const productConverter = {
       net_weight: data.net_weight || "",
       nutritional_info: data.nutritional_info || "",
       origin: data.origin || "",
+      category: data.category || "",
+      subcategory: data.subcategory || "",
     };
   },
 };
@@ -132,6 +136,8 @@ export const migrateProductData = (data: Record<string, unknown>): Product => {
       net_weight: String(data.net_weight || ""),
       nutritional_info: String(data.nutritional_info || ""),
       origin: String(data.origin || ""),
+      category: String(data.category || ""),
+      subcategory: String(data.subcategory || ""),
     };
 };
 
@@ -189,6 +195,60 @@ export const getProductsPaginated = async (options: PaginationOptions = {}): Pro
     const db = getFirebaseDB();
     const productsCollection = collection(db, "products");
     
+    // If we have search or filter, load all products and filter client-side
+    if (searchTerm || filterBrand) {
+      const allProductsQuery = query(productsCollection, orderBy("name"));
+      const allProductsSnapshot = await getDocs(allProductsQuery);
+      
+      const allProducts = allProductsSnapshot.docs.map(doc => {
+        const docData = doc.data();
+        return {
+          ...docData,
+          id: doc.id
+        };
+      }).map(migrateProductData);
+      
+      // Apply filtering
+      let filteredProducts = allProducts;
+      
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        filteredProducts = filteredProducts.filter(product => 
+          product.name.toLowerCase().includes(searchLower) ||
+          product.brand.toLowerCase().includes(searchLower) ||
+          product.barcode.includes(searchTerm)
+        );
+      }
+      
+      if (filterBrand) {
+        filteredProducts = filteredProducts.filter(product => product.brand === filterBrand);
+      }
+      
+      // Apply pagination to filtered results
+      const startIndex = lastDoc ? 0 : 0; // For search, we start from beginning
+      const endIndex = startIndex + pageSize;
+      const paginatedResults = filteredProducts.slice(startIndex, endIndex);
+      
+      return {
+        data: paginatedResults,
+        lastDoc: filteredProducts.length > endIndex ? allProductsSnapshot.docs[Math.min(endIndex - 1, allProductsSnapshot.docs.length - 1)] : null,
+        hasMore: filteredProducts.length > endIndex,
+        total: filteredProducts.length
+      };
+    }
+    
+    // Regular pagination for non-search queries
+    // Get total count first (only on first page)
+    let total = 0;
+    if (!lastDoc) {
+      try {
+        const countSnapshot = await getCountFromServer(productsCollection);
+        total = countSnapshot.data().count;
+      } catch (countError) {
+        console.warn("Failed to get total count, continuing without it:", countError);
+      }
+    }
+    
     // Build query
     let q = query(productsCollection, orderBy("name"), limit(pageSize + 1));
     
@@ -204,36 +264,19 @@ export const getProductsPaginated = async (options: PaginationOptions = {}): Pro
     const data = docs.slice(0, pageSize);
     
     // Convert and migrate data
-    const rawProducts = data.map(doc => {
+    const products = data.map(doc => {
       const docData = doc.data();
       return {
         ...docData,
         id: doc.id
       };
-    });
-    
-    const products = rawProducts.map(migrateProductData);
-    
-    // Apply client-side filtering for search and brand filter
-    let filteredProducts = products;
-    
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filteredProducts = filteredProducts.filter(product => 
-        product.name.toLowerCase().includes(searchLower) ||
-        product.brand.toLowerCase().includes(searchLower) ||
-        product.barcode.includes(searchTerm)
-      );
-    }
-    
-    if (filterBrand) {
-      filteredProducts = filteredProducts.filter(product => product.brand === filterBrand);
-    }
+    }).map(migrateProductData);
     
     return {
-      data: filteredProducts,
+      data: products,
       lastDoc: hasMore ? docs[pageSize - 1] : null,
-      hasMore
+      hasMore,
+      total: total > 0 ? total : undefined
     };
   } catch (error) {
     console.error("getProductsPaginated: Error getting products:", error);
@@ -249,6 +292,248 @@ export const getProductsCount = async (): Promise<number> => {
     return snapshot.data().count;
   } catch (error) {
     console.error("getProductsCount: Error getting products count:", error);
+    throw error;
+  }
+};
+
+export const getAllUniqueBrands = async (): Promise<string[]> => {
+  try {
+    const db = getFirebaseDB();
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, orderBy("brand"));
+    const querySnapshot = await getDocs(q);
+    
+    const brands = new Set<string>();
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.brand && data.brand.trim()) {
+        brands.add(data.brand.trim());
+      }
+    });
+    
+    return Array.from(brands).sort();
+  } catch (error) {
+    console.error("getAllUniqueBrands: Error getting unique brands:", error);
+    throw error;
+  }
+};
+
+export const getAllUniqueCategories = async (): Promise<string[]> => {
+  try {
+    const db = getFirebaseDB();
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, orderBy("category"));
+    const querySnapshot = await getDocs(q);
+    
+    const categories = new Set<string>();
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.category && data.category.trim()) {
+        categories.add(data.category.trim());
+      }
+    });
+    
+    return Array.from(categories).sort();
+  } catch (error) {
+    console.error("getAllUniqueCategories: Error getting unique categories:", error);
+    throw error;
+  }
+};
+
+export interface CategoryData {
+  id?: string;
+  name: string;
+  parentId?: string; // For subcategories - references parent category ID
+  level: 'category' | 'subcategory'; // Indicates if this is a main category or subcategory
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export const addCategory = async (categoryData: Omit<CategoryData, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  try {
+    const db = getFirebaseDB();
+    const categoriesCollection = collection(db, "categories");
+    
+    // Prepare data for Firestore, removing undefined values
+    const firestoreData: any = {
+      name: categoryData.name,
+      level: categoryData.level,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    // Only add parentId if it's defined (for subcategories)
+    if (categoryData.parentId) {
+      firestoreData.parentId = categoryData.parentId;
+    }
+    
+    const docRef = await addDoc(categoriesCollection, firestoreData);
+    return docRef.id;
+  } catch (error) {
+    console.error("addCategory: Error adding category:", error);
+    throw error;
+  }
+};
+
+export const updateCategory = async (id: string, categoryData: Partial<CategoryData>): Promise<void> => {
+  try {
+    const db = getFirebaseDB();
+    const categoryRef = doc(db, "categories", id);
+    
+    // Prepare update data, removing undefined values
+    const updateData: any = {
+      updatedAt: new Date()
+    };
+    
+    // Only add fields that are defined
+    if (categoryData.name !== undefined) updateData.name = categoryData.name;
+    if (categoryData.level !== undefined) updateData.level = categoryData.level;
+    if (categoryData.parentId !== undefined) {
+      if (categoryData.parentId) {
+        updateData.parentId = categoryData.parentId;
+      } else {
+        // If parentId is explicitly set to null/empty, remove it from Firestore
+        updateData.parentId = null;
+      }
+    }
+    
+    await updateDoc(categoryRef, updateData);
+  } catch (error) {
+    console.error("updateCategory: Error updating category:", error);
+    throw error;
+  }
+};
+
+export const deleteCategory = async (id: string): Promise<void> => {
+  try {
+    const db = getFirebaseDB();
+    const categoryRef = doc(db, "categories", id);
+    await deleteDoc(categoryRef);
+  } catch (error) {
+    console.error("deleteCategory: Error deleting category:", error);
+    throw error;
+  }
+};
+
+export const getCategories = async (): Promise<CategoryData[]> => {
+  try {
+    const db = getFirebaseDB();
+    const categoriesCollection = collection(db, "categories");
+    const q = query(categoriesCollection, orderBy("name"));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CategoryData));
+  } catch (error) {
+    console.error("getCategories: Error getting categories:", error);
+    throw error;
+  }
+};
+
+// Get only main categories (level: 'category')
+export const getMainCategories = async (): Promise<CategoryData[]> => {
+  try {
+    const db = getFirebaseDB();
+    const categoriesCollection = collection(db, "categories");
+    const q = query(categoriesCollection, orderBy("name"));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CategoryData))
+      .filter(category => category.level === 'category');
+  } catch (error) {
+    console.error("getMainCategories: Error getting main categories:", error);
+    throw error;
+  }
+};
+
+// Get subcategories for a specific parent category
+export const getSubcategories = async (parentId: string): Promise<CategoryData[]> => {
+  try {
+    const db = getFirebaseDB();
+    const categoriesCollection = collection(db, "categories");
+    const q = query(categoriesCollection, orderBy("name"));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CategoryData))
+      .filter(category => category.level === 'subcategory' && category.parentId === parentId);
+  } catch (error) {
+    console.error("getSubcategories: Error getting subcategories:", error);
+    throw error;
+  }
+};
+
+// Get all subcategories
+export const getAllSubcategories = async (): Promise<CategoryData[]> => {
+  try {
+    const db = getFirebaseDB();
+    const categoriesCollection = collection(db, "categories");
+    const q = query(categoriesCollection, orderBy("name"));
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CategoryData))
+      .filter(category => category.level === 'subcategory');
+  } catch (error) {
+    console.error("getAllSubcategories: Error getting all subcategories:", error);
+    throw error;
+  }
+};
+
+// Get unique categories from products (for backward compatibility)
+export const getUniqueCategoriesFromProducts = async (): Promise<string[]> => {
+  try {
+    const db = getFirebaseDB();
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, orderBy("category"));
+    const querySnapshot = await getDocs(q);
+    
+    const categories = new Set<string>();
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.category && data.category.trim()) {
+        categories.add(data.category.trim());
+      }
+    });
+    
+    return Array.from(categories).sort();
+  } catch (error) {
+    console.error("getUniqueCategoriesFromProducts: Error getting unique categories from products:", error);
+    throw error;
+  }
+};
+
+// Get unique subcategories from products (for backward compatibility)
+export const getUniqueSubcategoriesFromProducts = async (): Promise<string[]> => {
+  try {
+    const db = getFirebaseDB();
+    const productsCollection = collection(db, "products");
+    const q = query(productsCollection, orderBy("subcategory"));
+    const querySnapshot = await getDocs(q);
+    
+    const subcategories = new Set<string>();
+    querySnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.subcategory && data.subcategory.trim()) {
+        subcategories.add(data.subcategory.trim());
+      }
+    });
+    
+    return Array.from(subcategories).sort();
+  } catch (error) {
+    console.error("getUniqueSubcategoriesFromProducts: Error getting unique subcategories from products:", error);
     throw error;
   }
 };
@@ -353,6 +638,17 @@ export const getPreferencesPaginated = async (options: PaginationOptions = {}): 
     const db = getFirebaseDB();
     const preferencesCollection = collection(db, "preferences");
     
+    // Get total count first (only on first page or when no filters are applied)
+    let total = 0;
+    if (!lastDoc && !searchTerm && !filterType) {
+      try {
+        const countSnapshot = await getCountFromServer(preferencesCollection);
+        total = countSnapshot.data().count;
+      } catch (countError) {
+        console.warn("Failed to get total count, continuing without it:", countError);
+      }
+    }
+    
     // Build query
     let q = query(preferencesCollection, orderBy("name"), limit(pageSize + 1));
     
@@ -396,7 +692,8 @@ export const getPreferencesPaginated = async (options: PaginationOptions = {}): 
     return {
       data: filteredPreferences,
       lastDoc: hasMore ? docs[pageSize - 1] : null,
-      hasMore
+      hasMore,
+      total: total > 0 ? total : undefined
     };
   } catch (error) {
     console.error("getPreferencesPaginated: Error getting preferences:", error);

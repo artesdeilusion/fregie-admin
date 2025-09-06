@@ -14,11 +14,7 @@ import { useProducts } from "@/hooks/useFirestore";
 import { 
   addCategory, 
   updateCategory, 
-  deleteCategory, 
   getCategories, 
-  getMainCategories,
-  getSubcategories,
-  getAllSubcategories,
   CategoryData 
 } from "@/lib/firestore";
 import LoadingSpinner from "./LoadingSpinner";
@@ -45,19 +41,15 @@ export default function ContentManagementPage() {
     level: 'category'
   });
   const [savedCategories, setSavedCategories] = useState<CategoryData[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
 
   // Load saved categories on component mount
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        setLoadingCategories(true);
         const categories = await getCategories();
         setSavedCategories(categories);
       } catch (error) {
         console.error('Error loading categories:', error);
-      } finally {
-        setLoadingCategories(false);
       }
     };
 
@@ -95,8 +87,6 @@ export default function ContentManagementPage() {
     e.preventDefault();
     
     try {
-      setLoadingCategories(true);
-      
       if (editingCategoryId) {
         // Update existing category
         await updateCategory(editingCategoryId, {
@@ -124,8 +114,6 @@ export default function ContentManagementPage() {
     } catch (error) {
       console.error('Error saving category:', error);
       alert('Error saving category. Please try again.');
-    } finally {
-      setLoadingCategories(false);
     }
   };
 

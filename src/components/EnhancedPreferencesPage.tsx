@@ -9,8 +9,7 @@ import {
   HeartIcon,
   ExclamationTriangleIcon,
   TagIcon,
-  AdjustmentsHorizontalIcon,
-  ChartBarIcon
+  AdjustmentsHorizontalIcon
 } from "@heroicons/react/24/outline";
 import EnhancedPreferenceCard from "./EnhancedPreferenceCard";
 import EnhancedPreferenceForm from "./EnhancedPreferenceForm";

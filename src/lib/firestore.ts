@@ -15,6 +15,8 @@ import {
   startAfter,
   // where, // Unused import
   getCountFromServer,
+  FieldValue,
+  serverTimestamp,
 } from "firebase/firestore";
 import { getFirebaseDB } from "./firebase";
 import { Product, Preference, FormProduct, FormPreference } from "@/types";
@@ -355,11 +357,11 @@ export const addCategory = async (categoryData: Omit<CategoryData, 'id' | 'creat
     const categoriesCollection = collection(db, "categories");
     
     // Prepare data for Firestore, removing undefined values
-    const firestoreData: any = {
+    const firestoreData: Record<string, unknown> = {
       name: categoryData.name,
       level: categoryData.level,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
     
     // Only add parentId if it's defined (for subcategories)
@@ -381,8 +383,8 @@ export const updateCategory = async (id: string, categoryData: Partial<CategoryD
     const categoryRef = doc(db, "categories", id);
     
     // Prepare update data, removing undefined values
-    const updateData: any = {
-      updatedAt: new Date()
+    const updateData: Record<string, FieldValue | string | null> = {
+      updatedAt: serverTimestamp()
     };
     
     // Only add fields that are defined

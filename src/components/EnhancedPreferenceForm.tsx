@@ -7,7 +7,6 @@ import {
   PlusIcon, 
   ArrowUpTrayIcon,
   DocumentTextIcon,
-  ExclamationTriangleIcon,
   CheckCircleIcon,
   InformationCircleIcon
 } from "@heroicons/react/24/outline";
@@ -27,7 +26,6 @@ export default function EnhancedPreferenceForm({ preference, onSubmit, onCancel 
   });
 
   const [newIngredient, setNewIngredient] = useState("");
-  const [jsonFile, setJsonFile] = useState<File | null>(null);
   const [jsonData, setJsonData] = useState<Record<string, unknown> | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'json'>('manual');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -96,7 +94,6 @@ export default function EnhancedPreferenceForm({ preference, onSubmit, onCancel 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === "application/json") {
-      setJsonFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
@@ -104,7 +101,6 @@ export default function EnhancedPreferenceForm({ preference, onSubmit, onCancel 
           setJsonData(data);
         } catch {
           alert("Invalid JSON file");
-          setJsonFile(null);
         }
       };
       reader.readAsText(file);
@@ -129,7 +125,6 @@ export default function EnhancedPreferenceForm({ preference, onSubmit, onCancel 
         ingredients: ingredients,
       });
       
-      setJsonFile(null);
       setJsonData(null);
       setActiveTab('manual');
     } else {

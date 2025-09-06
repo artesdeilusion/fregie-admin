@@ -14,10 +14,12 @@ import { useProducts } from "@/hooks/useFirestore";
 import { 
   addCategory, 
   updateCategory, 
+  deleteCategory,
   getCategories, 
   CategoryData 
 } from "@/lib/firestore";
 import LoadingSpinner from "./LoadingSpinner";
+import Pagination from "./Pagination";
 
 interface Category {
   name: string;
@@ -41,12 +43,16 @@ export default function ContentManagementPage() {
     level: 'category'
   });
   const [savedCategories, setSavedCategories] = useState<CategoryData[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10); // Show 10 categories per page
 
   // Load saved categories on component mount
   useEffect(() => {
     const loadCategories = async () => {
       try {
+        console.log('Loading saved categories from Firebase...');
         const categories = await getCategories();
+        console.log('Loaded categories:', categories);
         setSavedCategories(categories);
       } catch (error) {
         console.error('Error loading categories:', error);
@@ -57,7 +63,7 @@ export default function ContentManagementPage() {
   }, []);
 
   // Analyze existing categories from products
-  const categories = useMemo(() => {
+  const analyzedCategories = useMemo(() => {
     const categoryMap = new Map<string, Category>();
     
     products.forEach(product => {
@@ -83,37 +89,96 @@ export default function ContentManagementPage() {
     return Array.from(categoryMap.values()).sort((a, b) => b.productCount - a.productCount);
   }, [products]);
 
+  // Combine saved categories with analyzed categories
+  const categories = useMemo(() => {
+    console.log('Combining categories - analyzed:', analyzedCategories.length, 'saved:', savedCategories.length);
+    
+    const combinedCategories = new Map<string, Category>();
+    
+    // Add analyzed categories from products
+    analyzedCategories.forEach(cat => {
+      combinedCategories.set(cat.name, cat);
+    });
+    
+    // Add saved categories from Firebase (if not already present)
+    savedCategories.forEach(savedCat => {
+      if (!combinedCategories.has(savedCat.name)) {
+        console.log('Adding saved category:', savedCat.name);
+        combinedCategories.set(savedCat.name, {
+          name: savedCat.name,
+          productCount: 0,
+          subcategories: []
+        });
+      }
+    });
+    
+    const result = Array.from(combinedCategories.values()).sort((a, b) => b.productCount - a.productCount);
+    console.log('Final combined categories:', result.length, result.map(c => c.name));
+    return result;
+  }, [analyzedCategories, savedCategories]);
+
+  // Pagination logic for categories
+  const totalCategories = categories.length;
+  const totalPages = Math.ceil(totalCategories / pageSize);
+  const startIndex = (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, totalCategories);
+  const paginatedCategories = categories.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate form data
+    if (!categoryFormData.name.trim()) {
+      alert('Please enter a category name.');
+      return;
+    }
+    
+    if (categoryFormData.level === 'subcategory' && !categoryFormData.parentId) {
+      alert('Please select a parent category for the subcategory.');
+      return;
+    }
+    
     try {
+      console.log('Submitting category data:', categoryFormData);
+      
       if (editingCategoryId) {
         // Update existing category
+        console.log('Updating category with ID:', editingCategoryId);
         await updateCategory(editingCategoryId, {
-          name: categoryFormData.name,
+          name: categoryFormData.name.trim(),
           level: categoryFormData.level,
           parentId: categoryFormData.parentId
         });
+        console.log('Category updated successfully');
       } else {
         // Add new category
-        await addCategory({
-          name: categoryFormData.name,
+        console.log('Adding new category');
+        const newCategoryId = await addCategory({
+          name: categoryFormData.name.trim(),
           level: categoryFormData.level,
           parentId: categoryFormData.parentId
         });
+        console.log('Category added successfully with ID:', newCategoryId);
       }
       
       // Refresh categories
+      console.log('Refreshing categories list');
       const updatedCategories = await getCategories();
       setSavedCategories(updatedCategories);
+      console.log('Categories refreshed:', updatedCategories.length, 'categories');
       
       setShowCategoryForm(false);
       setEditingCategory(null);
       setEditingCategoryId(null);
       setCategoryFormData({ name: '', level: 'category' });
+      console.log('Form reset and modal closed');
     } catch (error) {
       console.error('Error saving category:', error);
-      alert('Error saving category. Please try again.');
+      alert(`Error saving category: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -126,10 +191,31 @@ export default function ContentManagementPage() {
     setShowCategoryForm(true);
   };
 
-  const handleDeleteCategory = (categoryName: string) => {
+  const handleDeleteCategory = async (categoryName: string) => {
     if (confirm(`Are you sure you want to delete the category "${categoryName}"? This will not delete the products, but they will become uncategorized.`)) {
-      // Handle category deletion
-      console.log('Deleting category:', categoryName);
+      try {
+        // Find the category in saved categories to get its ID
+        const savedCategory = savedCategories.find(cat => cat.name === categoryName);
+        
+        if (!savedCategory || !savedCategory.id) {
+          alert('Cannot delete this category. It may be derived from existing products and not saved in the database.');
+          return;
+        }
+        
+        console.log('Deleting category:', categoryName, 'with ID:', savedCategory.id);
+        await deleteCategory(savedCategory.id);
+        
+        // Refresh categories
+        console.log('Refreshing categories after deletion');
+        const updatedCategories = await getCategories();
+        setSavedCategories(updatedCategories);
+        console.log('Categories refreshed after deletion:', updatedCategories.length, 'categories');
+        
+        alert('Category deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert(`Error deleting category: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
   };
 
@@ -205,7 +291,7 @@ export default function ContentManagementPage() {
           </div>
         </div>
         <div className="divide-y divide-gray-200">
-          {categories.map((category) => (
+          {paginatedCategories.map((category) => (
             <div key={category.name} className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -242,25 +328,48 @@ export default function ContentManagementPage() {
                 </div>
                 
                 <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleEditCategory(category.name)}
-                    className="p-2 text-gray-400 hover:text-gray-600"
-                    title="Edit category"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCategory(category.name)}
-                    className="p-2 text-gray-400 hover:text-red-600"
-                    title="Delete category"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
+                  {savedCategories.find(cat => cat.name === category.name) ? (
+                    // This is a saved category - can be edited and deleted
+                    <>
+                      <button
+                        onClick={() => handleEditCategory(category.name)}
+                        className="p-2 text-gray-400 hover:text-gray-600"
+                        title="Edit category"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCategory(category.name)}
+                        className="p-2 text-gray-400 hover:text-red-600"
+                        title="Delete category"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    // This is an analyzed category from products - cannot be edited/deleted
+                    <span className="text-xs text-gray-500 italic">
+                      From products
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
           ))}
         </div>
+        
+        {/* Pagination */}
+        {totalCategories > pageSize && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            total={totalCategories}
+            loading={loading}
+          />
+        )}
       </div>
 
       {/* Category Form Modal */}

@@ -2,8 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { QueryDocumentSnapshot } from "firebase/firestore";
 import { Product, Preference, FormProduct, FormPreference } from "@/types";
 import {
+  getProducts,
   getProductsPaginated,
+  getPreferences,
   getPreferencesPaginated,
+  getProductsCount,
+  getPreferencesCount,
   addProduct,
   updateProduct,
   deleteProduct,
@@ -63,6 +67,17 @@ export function useProductPagination() {
       
       setError(null);
       
+      // If no search or filter, load all products for client-side pagination
+      if (!debouncedSearchTerm && !debouncedFilterBrand) {
+        const allProducts = await getProducts();
+        setAllProducts(allProducts);
+        setTotal(allProducts.length);
+        setCurrentPage(1);
+        setHasMore(false); // We have all products, no more to load
+        return;
+      }
+      
+      // For search/filter, use server-side pagination
       const options: PaginationOptions = {
         pageSize,
         lastDoc: reset || page === 1 ? undefined : lastDoc || undefined,
@@ -74,7 +89,7 @@ export function useProductPagination() {
       
       if (reset || page === 1) {
         setAllProducts(result.data);
-        setTotal(result.total || 0);
+        setTotal(result.total || result.data.length);
       } else {
         setAllProducts(prev => [...prev, ...result.data]);
       }
@@ -267,6 +282,17 @@ export function usePreferencePagination() {
       
       setError(null);
       
+      // If no search or filter, load all preferences for client-side pagination
+      if (!debouncedSearchTerm && !debouncedFilterType) {
+        const allPreferences = await getPreferences();
+        setPreferences(allPreferences);
+        setTotal(allPreferences.length);
+        setCurrentPage(1);
+        setHasMore(false); // We have all preferences, no more to load
+        return;
+      }
+      
+      // For search/filter, use server-side pagination
       const options: PaginationOptions = {
         pageSize,
         lastDoc: reset || page === 1 ? undefined : lastDoc || undefined,
@@ -278,7 +304,7 @@ export function usePreferencePagination() {
       
       if (reset || page === 1) {
         setPreferences(result.data);
-        setTotal(result.total || 0);
+        setTotal(result.total || result.data.length);
         setCurrentPage(1);
       } else {
         setPreferences(prev => [...prev, ...result.data]);

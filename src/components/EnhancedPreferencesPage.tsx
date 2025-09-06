@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Preference, FormPreference } from "@/types";
 import { 
   MagnifyingGlassIcon, 
@@ -15,7 +15,8 @@ import EnhancedPreferenceCard from "./EnhancedPreferenceCard";
 import EnhancedPreferenceForm from "./EnhancedPreferenceForm";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
-import { usePreferences } from "@/hooks/useFirestore";
+import Pagination from "./Pagination";
+import { usePreferencePagination } from "@/hooks/usePagination";
 
 export default function EnhancedPreferencesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -24,16 +25,35 @@ export default function EnhancedPreferencesPage() {
   const [filterType, setFilterType] = useState("");
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const { preferences, loading, error, addPreference, updatePreference, deletePreference, refetch } = usePreferences();
+  const { 
+    preferences, 
+    loading, 
+    error, 
+    total,
+    currentPage,
+    totalPages,
+    startIndex,
+    endIndex,
+    searchTerm: hookSearchTerm,
+    search: hookSearch,
+    addPreference, 
+    updatePreference, 
+    deletePreference, 
+    refetch,
+    goToPage
+  } = usePreferencePagination();
+
+  // Sync local searchTerm with hook's searchTerm
+  useEffect(() => {
+    setSearchTerm(hookSearchTerm);
+  }, [hookSearchTerm]);
 
   const filteredPreferences = useMemo(() => {
     return preferences.filter((preference) => {
-      const matchesSearch = preference.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          preference.typeId.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = !filterType || preference.type === filterType;
-      return matchesSearch && matchesType;
+      return matchesType;
     });
-  }, [preferences, searchTerm, filterType]);
+  }, [preferences, filterType]);
 
   const uniqueTypes = useMemo(() => {
     return Array.from(new Set(preferences.map(p => p.type))).sort();
@@ -171,7 +191,10 @@ export default function EnhancedPreferencesPage() {
                 type="text"
                 placeholder="Search preferences by name or type ID..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  hookSearch(e.target.value);
+                }}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -231,6 +254,7 @@ export default function EnhancedPreferencesPage() {
               onClick={() => {
                 setSearchTerm("");
                 setFilterType("");
+                hookSearch("");
               }}
               className="text-blue-600 hover:text-blue-800"
             >
@@ -281,6 +305,19 @@ export default function EnhancedPreferencesPage() {
             />
           ))}
         </div>
+      )}
+
+      {/* Pagination */}
+      {preferences.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          total={total}
+          loading={loading}
+        />
       )}
 
       {/* Preference Form Modal */}
